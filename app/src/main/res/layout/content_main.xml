@@ -11,14 +11,14 @@
         android:id="@+id/container_body"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
+
     </FrameLayout>
 
-    <SearchView
+    <ProgressBar
+        style="?android:attr/progressBarStyleLarge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:paddingRight="10dp"
-        android:layout_alignParentTop="true"
-        android:id="@+id/searchView" />
+        android:id="@+id/progressBar"
+        android:layout_centerInParent="true"/>
 
 </RelativeLayout>

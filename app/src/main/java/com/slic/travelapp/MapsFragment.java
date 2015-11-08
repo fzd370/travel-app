@@ -1,33 +1,28 @@
 package com.slic.travelapp;
 
 import android.Manifest;
-import android.app.SearchManager;
-import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.widget.SearchView;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
@@ -36,6 +31,8 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**  Map Fragment
  *  Upon launching, it should be fed the relavent information for ploting of the markers.
@@ -43,12 +40,24 @@ import java.util.List;
  *  Click of a marker will make appear the Uber Floating Button from Main Activity
  */
 public class MapsFragment extends Fragment implements
-        OnMapReadyCallback, ActivityCompat.OnRequestPermissionsResultCallback,
+        OnMapReadyCallback,
         GoogleMap.OnMyLocationButtonClickListener,
-        GoogleMap.OnMarkerClickListener, GoogleMap.OnMapClickListener{
+        GoogleMap.OnMarkerClickListener,
+        GoogleMap.OnMapClickListener,
+        ActivityCompat.OnRequestPermissionsResultCallback,
+        View.OnClickListener
+
+{
     private GoogleMap mMap;
+    private Geocoder myGcdr;
+
     private static ArrayList<LatLng> geoList;
     private static ArrayList<String> locationList;
+    private static SpellChecker spellChecker;
+    private static String locationReplace;
+    private EditText inputSearch;
+    private Button buttonSearch;
+    private LinearLayout barSearch;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -58,15 +67,21 @@ public class MapsFragment extends Fragment implements
         try{
             if(bundle != null) {
                 locationList = bundle.getStringArrayList("LOCLIST"); // Receives Location List that is read from file while in the Main Activity
-
-                // POTENTIAL BUG - SHOULD INITTASK BE MOVED INTO onMapReady() ??
-                new InitTask().execute(locationList, null, null);    // Parse information into Initializer(String -> GeoCode -> Place markers)
-                //geoList = getLoc(locationList);
+                if(locationList == null) {
+                    locationList = new ArrayList<String>();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            shout("Init failed");
+            shout("Get from bundle Fail");
         }
+
+        spellChecker = new SpellChecker();
+
+        inputSearch = (EditText) rootView.findViewById(R.id.input_search);
+        buttonSearch = (Button) rootView.findViewById(R.id.button_search);
+        buttonSearch.setOnClickListener(this);
+        barSearch = (LinearLayout) rootView.findViewById(R.id.bar_search);
 
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
@@ -96,12 +111,16 @@ public class MapsFragment extends Fragment implements
         mMap.setOnMapClickListener(this);                 // Used to hide Taxi Button
         mMap.getUiSettings().setMapToolbarEnabled(false); // Disables (button-right)button that is used to open Google Maps
 
+        onMyLocationButtonClick();
+
+        // POTENTIAL BUG - SHOULD INITTASK BE MOVED INTO onMapReady() ??1
+        new InitTask().execute(locationList, null, null);    // Parse information into Initializer(String -> GeoCode -> Place markers)
     }
 
     // Called by Init
     // Translated String to Geocode(Input : List of Location names)
     public ArrayList<LatLng> getLoc(ArrayList<String> locationList) {
-        Geocoder myGcdr = new Geocoder(getContext());
+        myGcdr = new Geocoder(getContext());
         ArrayList<List<Address>> matchedList = new ArrayList<List<Address>>();
         ArrayList<LatLng> geoList = new ArrayList<LatLng>();
         shout("LOCLIST : " + locationList.toString());
@@ -131,6 +150,20 @@ public class MapsFragment extends Fragment implements
         return geoList;
     }
 
+    public LatLng getLatLng(String locationName) {
+        LatLng loc = null;
+        try {
+            List<Address> matches = myGcdr.getFromLocationName(locationName, 1);
+            double lat = matches.get(0).getLatitude();
+            double lon = matches.get(0).getLongitude();
+            loc = new LatLng(lat, lon);
+        } catch (IOException e) {
+            e.printStackTrace();
+            shout("Problem in getLngLat");
+        }
+        return loc;
+    }
+
     // Called by Init
     // Call to automatically place the markers, to call
     private void placeMarkers() {
@@ -141,6 +174,11 @@ public class MapsFragment extends Fragment implements
 
         //Start building the bounds
         LatLngBounds.Builder bound = LatLngBounds.builder();
+
+        if(geoList.size() <= 0 || locationList.size() <= 0){
+            shout("Geo Size or Location size <= Zero");
+            return;
+        }
 
         // Draw markers and add points into bound builder
         try {
@@ -189,6 +227,10 @@ public class MapsFragment extends Fragment implements
 
     // Removes Indexing from title to feed into Uber API, as a name for the Drop-Off Point
     private String cleanTitle(String title) {
+        if(title.length() <= 0)
+            return "Destination";
+        if(title.charAt(0) < '0' || title.charAt(0) > '9')
+            return title;
         int space = title.indexOf(" ");
         if(space+1 < title.length())
             return title.substring(space+1);
@@ -205,12 +247,26 @@ public class MapsFragment extends Fragment implements
         ((MainActivity)getActivity()).setDest(marker.getPosition());
         ((MainActivity)getActivity()).setName(cleanTitle(marker.getTitle()));
         ((MainActivity)getActivity()).fab.show(); //getTaxi(getSrcLoc(), destLoc);
+
+        barSearch.setVisibility(View.GONE);
         return false;
     }
 
     @Override
     public void onMapClick(LatLng latLng) {
         ((MainActivity)getActivity()).fab.hide();
+        barSearch.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onClick(View v) {
+        int id = v.getId();
+        if(id == R.id.button_search) {
+            ArrayList<String> inputList = new ArrayList<String>();
+            inputList.add(inputSearch.getText().toString());
+            getActivity().findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+            new CheckTask().execute(inputList, null, null);
+        }
     }
 
     private class InitTask extends AsyncTask<ArrayList<String>, Integer, Integer> {
@@ -230,7 +286,154 @@ public class MapsFragment extends Fragment implements
         }
     }
 
+    private class CheckTask extends AsyncTask<ArrayList<String>, Integer, Integer> {
+        @Override
+        protected Integer doInBackground(ArrayList<String>... params) {
+            // Enable loading bar
+
+            String locationInput = params[0].get(0);
+            locationReplace = spellChecker.spellcorrector(locationInput);
+            if(locationReplace == null) {
+                shout("No match found!");
+                locationReplace = locationInput;
+            }
+            return null;
+        }
+        @Override
+        protected void onPostExecute(Integer integer) {
+            try {
+                mMap.clear();
+                shout(locationReplace);
+                LatLng loc = getLatLng(locationReplace);
+                drawMarker(loc, locationReplace);
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(loc, 11));
+                inputSearch.setText(locationReplace);
+                shout("CheckTask Sucess");
+
+                getActivity().findViewById(R.id.progressBar).setVisibility(View.GONE);
+            } catch (Exception e){
+                e.printStackTrace();
+                shout("CheckTask Fail");
+            }
+        }
+    }
+
     private void shout(String s) {
         Log.d("SLIC", s);
     }
+
+    public static class SpellChecker {
+
+        private static final int NANO_TIMEOUT = 2000000000;
+        private long started, time;
+        public List<String> locations = null;
+        public boolean isDone = false;
+
+        public SpellChecker() {
+            this.locations = locationGenerator();
+        }
+
+        public static List<String> locationGenerator(){
+            List<String> itemList = new ArrayList<String>();
+            itemList.add("Marina Bay Sands");
+            itemList.add("Singapore Flyer");
+            itemList.add("Vivo City");
+            itemList.add("Resorts World Sentosa");
+            itemList.add("Buddha Tooth Relic Temple");
+            itemList.add("Zoo");
+            return itemList;
+        }
+        //Takes in a word
+        //returns list of possible words with edit distance 1
+        public List<String> typos1(String s){
+
+            List<String> typos1 = new ArrayList<String>();
+
+            //missing letter typo eg: Sentosa -> sntosa
+            for (int i = 0; i < s.length(); i++){
+                typos1.add(s.substring(0,i) + s.substring(i+1));
+            }
+
+            //misplaced letter typo eg: Sentosa -> snetosa
+            for (int i = 0; i < s.length()-1; i++){
+                typos1.add(s.substring(0,i) + s.substring(i+1,i+2) + s.substring(i, i+1) + s.substring(i+2));
+            }
+
+            //extra letter typo eg: Sentosa -> sentossa
+            for (int i=0; i < s.length()+1; i++){
+                for (char c = 'a'; c <= 'z'; c++){
+                    typos1.add(s.substring(0,i) + String.valueOf(c) + s.substring(i));
+                }
+            }
+
+            //wrong letter typo eg Sentosa -> swntosa
+            for (int i=0; i < s.length(); i++){
+                for (char c = 'a'; c <= 'z'; c++){
+                    typos1.add(s.substring(0,i) + String.valueOf(c) + s.substring(i+1));
+                }
+            }
+
+            return typos1;
+        }
+
+        //takes in list of words and returns list of words with typos of edit distance 2
+        public List<String> typos2(List<String> list){
+            List<String> typos2 = new ArrayList<String>();
+            for (String s : list){
+                typos2.addAll(typos1(s));
+            }
+            return typos2;
+        }
+
+        public boolean checkTimeout(){
+            time = System.nanoTime();
+            long timeTaken= time - started;
+            if(timeTaken > NANO_TIMEOUT) {
+                Log.d("SLIC", "Time: " + timeTaken);
+                isDone = true;
+                return true;
+            }
+            return false;
+        }
+
+        public String spellcorrector(String word){
+            isDone = false;
+            started = System.nanoTime();
+            word = word.replaceAll(" ", "");
+            word = word.toLowerCase();
+            //locationGenerator();
+            List<String> locations1 = new ArrayList<String>();
+            for (int i = 0; i < locations.size(); i++){
+                String loc = locations.get(i).replaceAll(" ","");
+                locations1.add(loc.toLowerCase());
+                if(checkTimeout()) return null;
+            }
+            if (locations1.contains(word)){return locations.get(locations1.indexOf(word));}
+            List<String> possiblewords1 = typos1(word);
+            for (String s : possiblewords1){
+                Pattern p = Pattern.compile(s);
+                for (String location: locations1){
+                    Matcher m = p.matcher(location);
+                    if (m.find()){
+                        return locations.get(locations1.indexOf(location));
+                    }
+                    if(checkTimeout()) return null;
+                }
+            }
+            List<String> possiblewords2 = typos2(possiblewords1);
+            for (String s : possiblewords2){
+                Pattern p = Pattern.compile(s);
+                for (String location: locations1){
+                    Matcher m = p.matcher(location);
+                    if (m.find()){
+                        return locations.get(locations1.indexOf(location));
+                    }
+                    if(checkTimeout()) return null;
+                }
+            }
+            isDone = true;
+            return null;
+        }
+    }
+
 }

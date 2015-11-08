@@ -35,11 +35,6 @@
                 android:resource="@xml/searchable"/>
         </activity>
 
-        <provider
-            android:name=".service.PlaceProvider"
-            android:authorities="com.slic.travelapp.PlaceProvider"
-            android:exported="false" />
-
     </application>
 
 </manifest>

@@ -1,35 +1,33 @@
 package com.slic.travelapp;
 
-import android.app.LoaderManager;
-import android.app.SearchManager;
-import android.content.Context;
-import android.content.CursorLoader;
+import android.Manifest;
 import android.content.Intent;
-import android.content.Loader;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
+import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
-
-import android.util.Log;
-import android.view.View;
-import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.SearchView;
+import android.view.View;
+import android.widget.Toast;
 
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.model.LatLng;
-import com.slic.travelapp.service.PlaceProvider;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -49,8 +47,10 @@ import java.util.ArrayList;
 * */
 
 public class MainActivity extends AppCompatActivity implements
-        NavigationView.OnNavigationItemSelectedListener, LoaderManager.LoaderCallbacks<Cursor> {
+        NavigationView.OnNavigationItemSelectedListener,
+        ActivityCompat.OnRequestPermissionsResultCallback{
 
+    private static final int REQUEST_LOCATION = 1;
     private static final String FILE_PATH = "location_cache.dat";
     private static final String CLIENT_ID = "475054250915-pjo5gu01j8hjc2dnab0qg4prra4ocljc.apps.googleusercontent.com";
     public FloatingActionButton fab;
@@ -65,9 +65,9 @@ public class MainActivity extends AppCompatActivity implements
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        initSearchView();
-        handleIntent(getIntent());
+        checkSelfPermission();
 
+        findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
         fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.hide();
         fab.setOnClickListener(new View.OnClickListener() {
@@ -92,45 +92,43 @@ public class MainActivity extends AppCompatActivity implements
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
+
+
         //launchFragment(R.id.nav_home); // Initialize screen to the choosen fragment
     }
 
-    public void initSearchView() {
-        // Get the SearchView and set the searchable configuration
-        SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
-        SearchView searchView = (SearchView) findViewById(R.id.searchView);
-        // Assumes current activity is the searchable activity
-        searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
-        searchView.setIconifiedByDefault(true); // Do not iconify the widget; expand it by default
-    }
-
-    public void handleIntent(Intent intent) {
-        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-            String query = intent.getStringExtra(SearchManager.QUERY);
-            doSearch(query);
-        }else if(intent.getAction().equals(Intent.ACTION_VIEW)){
-            String query = intent.getStringExtra(SearchManager.EXTRA_DATA_KEY);
-            getPlace(query);
+    private void checkSelfPermission() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            // Check Permissions Now
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    REQUEST_LOCATION);
+            Toast.makeText(this, "Need permission for maps to work properly", Toast.LENGTH_LONG).show();
+            checkSelfPermission();
+            shout("Denied in onRequest");
+        } else {
+            // permission has been granted, continue as usual
+//            Location myLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+            shout("Granted in SelfCheck");
         }
-    }
-    public void doSearch(String query){
-        shout("SEARCH: " + query);
-        Bundle data = new Bundle();
-        data.putString("query", query);
-        getLoaderManager().restartLoader(0, data, this);
-    }
-    public void getPlace(String query){
-        shout("PLACE: " + query);
-        Bundle data = new Bundle();
-        data.putString("query", query);
-        getLoaderManager().restartLoader(1, data, this);
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleIntent(intent);
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION) {
+            if(grantResults.length == 1
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // We can now safely use the API we requested access to
+//                Location myLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                shout("Granted in onRequest");
+            } else {
+                Toast.makeText(this, "Need permission for maps to work properly", Toast.LENGTH_LONG).show();
+                shout("Denied in onRequest");
+                // Permission was denied or request was cancelled
+            }
+        }
     }
 
     @Override
@@ -281,26 +279,13 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("SLIC", s);
     }
 
-    @Override
-    public Loader<Cursor> onCreateLoader(int arg0, Bundle query) {
-        CursorLoader cLoader = null;
-        if(arg0==0)
-            cLoader = new CursorLoader(getBaseContext(), PlaceProvider.SEARCH_URI, null, null, new String[]{ query.getString("query") }, null);
-        else if(arg0==1)
-            cLoader = new CursorLoader(getBaseContext(), PlaceProvider.DETAILS_URI, null, null, new String[]{ query.getString("query") }, null);
-        return cLoader;
+
+    public void doSearch(String query){
+        shout("SEARCH: " + query);
     }
-
-    @Override
-    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
-        showLocations(data);
+    public void getPlace(String query){
+        shout("PLACE: " + query);
     }
-
-    @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
-
-    }
-
     private void showLocations(Cursor c){
         shout("SHOW LOCATIONS!");
     }
