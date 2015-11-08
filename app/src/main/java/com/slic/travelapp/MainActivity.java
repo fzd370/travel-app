@@ -1,33 +1,43 @@
 package com.slic.travelapp;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
+
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.view.GravityCompat;
+import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.DragEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.model.LatLng;
+import com.slic.travelapp.ItinearyComponents.AttractionsFragment;
+import com.slic.travelapp.ItinearyComponents.BudgetFragment;
+import com.slic.travelapp.ItinearyComponents.ItineraryFragment;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -48,7 +58,10 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements
         NavigationView.OnNavigationItemSelectedListener,
-        ActivityCompat.OnRequestPermissionsResultCallback{
+        ActivityCompat.OnRequestPermissionsResultCallback,
+        BudgetFragment.OnFragmentInteractionListener,
+        AttractionsFragment.OnFragmentInteractionListener,
+        ItineraryFragment.OnFragmentInteractionListener{
 
     private static final int REQUEST_LOCATION = 1;
     private static final String FILE_PATH = "location_cache.dat";
@@ -57,6 +70,13 @@ public class MainActivity extends AppCompatActivity implements
     private static LatLng srcLoc = null;
     private static LatLng destLoc = null;
     private static String destName = null;
+
+    private SectionsPagerAdapter mSectionsPagerAdapter;
+    private ViewPager mViewPager;
+    ArrayList<String> checkedAttractions = new ArrayList<>();
+    int budget;
+    String hotel;
+    boolean itineraryExhaustiveEnumeration = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,7 +87,6 @@ public class MainActivity extends AppCompatActivity implements
 
         checkSelfPermission();
 
-        findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
         fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.hide();
         fab.setOnClickListener(new View.OnClickListener() {
@@ -82,19 +101,32 @@ public class MainActivity extends AppCompatActivity implements
                         }).show();
             }
         });
+        findViewById(R.id.progressBar).setVisibility(View.GONE);    // Disable Progress bar
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.setDrawerListener(toggle);
+        drawer.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                hideKeyboard();
+//                findViewById(R.id.drawer_layout).requestFocus();
+                return false;
+            }
+        });
         toggle.syncState();
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
+        mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
+        mViewPager = (ViewPager) findViewById(R.id.view_container);
+        mViewPager.setAdapter(mSectionsPagerAdapter);
+        TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
+        tabLayout.setupWithViewPager(mViewPager);
 
-
-        //launchFragment(R.id.nav_home); // Initialize screen to the choosen fragment
+        launchFragment(R.id.nav_home); // Initialize screen to the choosen fragment
     }
 
     private void checkSelfPermission() {
@@ -165,12 +197,21 @@ public class MainActivity extends AppCompatActivity implements
         return super.onOptionsItemSelected(item);
     }
 
+    protected void hideKeyboard() {
+        View view = this.getCurrentFocus();
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
     public boolean onNavigationItemSelected(MenuItem item) {
         launchFragment(item.getItemId());
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
+        hideKeyboard();
         return true;
     }
 
@@ -187,8 +228,12 @@ public class MainActivity extends AppCompatActivity implements
             bundle.putStringArrayList("LOCLIST", retrieveLocation());
             fragment = new MapsFragment();
             fragment.setArguments(bundle);
-        } else if (id == R.id.nav_plan) {
-            fragment = new PlanFragment();
+        }else if (id == R.id.nav_plan) {
+            // Hides fragment layers, Show Tab and Pager
+            findViewById(R.id.tabs).setVisibility(View.VISIBLE);
+            findViewById(R.id.view_container).setVisibility(View.VISIBLE);
+            findViewById(R.id.fragment_container).setVisibility(View.GONE);
+
         } else if (id == R.id.nav_find) {
             fragment = new FindFragment();
         } else if (id == R.id.nav_item) {
@@ -198,6 +243,11 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         if (fragment != null) {
+            // Hides the Tab and viewPager, Show fragment layer
+            findViewById(R.id.tabs).setVisibility(View.GONE);
+            findViewById(R.id.appbar).setVisibility(View.VISIBLE);
+            findViewById(R.id.view_container).setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
             fragmentTransaction.replace(R.id.container_body, fragment);
             fragmentTransaction.commit();
         }
@@ -279,14 +329,139 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("SLIC", s);
     }
 
+    @Override
+    public void onBudgetUpdated(int budget, String hotel, boolean exhaustiveMode) {
+        Toast.makeText(this, String.valueOf(budget), Toast.LENGTH_SHORT).show();
 
-    public void doSearch(String query){
-        shout("SEARCH: " + query);
+        this.budget = budget;
+        this.hotel = hotel;
+        this.itineraryExhaustiveEnumeration = exhaustiveMode;
+
+        mSectionsPagerAdapter.notifyDataSetChanged();
+
+        hideKeyboard();
+
+        ((ViewPager) findViewById(R.id.view_container)).setCurrentItem(1);
     }
-    public void getPlace(String query){
-        shout("PLACE: " + query);
+
+    @Override
+    public void onAttractionsSelected(ArrayList<String> selectedAttractions) {
+        shout("onAttractions in");
+        this.checkedAttractions = selectedAttractions;
+
+        //mSectionsPagerAdapter.notifyDataSetChanged();
+
+        shout("onAttractions done");
+
+        String checkedAttractionsString = "";
+        for (String selectedAttraction :
+                selectedAttractions) {
+            checkedAttractionsString += " " + selectedAttraction;
+        }
+
+        Toast.makeText(this, checkedAttractionsString, Toast.LENGTH_SHORT).show();
+        shout(checkedAttractionsString);
     }
-    private void showLocations(Cursor c){
-        shout("SHOW LOCATIONS!");
+
+    @Override
+    public void onFragmentInteraction(String id) {
+
+    }
+
+
+    /**
+     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
+     * one of the sections/tabs/pages.
+     */
+    public class SectionsPagerAdapter extends FragmentPagerAdapter {
+
+        private final FragmentManager mFragmentManager;
+
+        public SectionsPagerAdapter(FragmentManager fm) {
+            super(fm);
+            mFragmentManager = fm;
+        }
+
+        @Override
+        public int getItemPosition(Object object) {
+            if (object instanceof ItineraryFragment) {
+                mFragmentManager.beginTransaction().remove((Fragment) object).commit();
+                Log.i("MyActivity", "Destroying ItineraryFragment");
+                return POSITION_NONE;
+            } else {
+                return super.getItemPosition(object);
+            }
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            // getItem is called to instantiate the fragment for the given page.
+            switch (position) {
+                case 0:
+                    return BudgetFragment.newInstance("", "");
+                case 1:
+                    return AttractionsFragment.newInstance("", "");
+                case 2:
+                    Log.i("MyActivity", "getItem is called for ItineraryFragment");
+                    return ItineraryFragment.newInstance(budget, checkedAttractions, itineraryExhaustiveEnumeration);
+                default:
+                    // Return a PlaceholderFragment (defined as a static inner class below).
+                    return PlaceholderFragment.newInstance(position + 1);
+            }
+        }
+
+        @Override
+        public int getCount() {
+            // Show 3 total pages.
+            return 3;
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            switch (position) {
+                case 0:
+                    return "BUDGET";
+                case 1:
+                    return "ATTRACTIONS";
+                case 2:
+                    return "ITINERARY";
+            }
+            return null;
+        }
+    }
+
+    /**
+     * A placeholder fragment containing a simple view.
+     */
+    public static class PlaceholderFragment extends Fragment {
+        /**
+         * The fragment argument representing the section number for this
+         * fragment.
+         */
+        private static final String ARG_SECTION_NUMBER = "section_number";
+
+        /**
+         * Returns a new instance of this fragment for the given section
+         * number.
+         */
+        public static PlaceholderFragment newInstance(int sectionNumber) {
+            PlaceholderFragment fragment = new PlaceholderFragment();
+            Bundle args = new Bundle();
+            args.putInt(ARG_SECTION_NUMBER, sectionNumber);
+            fragment.setArguments(args);
+            return fragment;
+        }
+
+        public PlaceholderFragment() {
+        }
+
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                                 Bundle savedInstanceState) {
+            View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+            TextView textView = (TextView) rootView.findViewById(R.id.section_label);
+            textView.setText(getString(R.string.section_format, getArguments().getInt(ARG_SECTION_NUMBER)));
+            return rootView;
+        }
     }
 }

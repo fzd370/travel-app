@@ -1,6 +1,8 @@
 package com.slic.travelapp;
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -12,11 +14,14 @@ import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -46,7 +51,6 @@ public class MapsFragment extends Fragment implements
         GoogleMap.OnMapClickListener,
         ActivityCompat.OnRequestPermissionsResultCallback,
         View.OnClickListener
-
 {
     private GoogleMap mMap;
     private Geocoder myGcdr;
@@ -82,9 +86,13 @@ public class MapsFragment extends Fragment implements
         buttonSearch = (Button) rootView.findViewById(R.id.button_search);
         buttonSearch.setOnClickListener(this);
         barSearch = (LinearLayout) rootView.findViewById(R.id.bar_search);
+        View mFragment = rootView.findViewById(R.id.map);
+        //mFragment.setOnTouchListener(this);
 
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
+
         mapFragment.getMapAsync(this);
+
         return rootView;
     }
 
@@ -110,7 +118,6 @@ public class MapsFragment extends Fragment implements
         mMap.setOnMarkerClickListener(this);              // Used to show Taxi Button
         mMap.setOnMapClickListener(this);                 // Used to hide Taxi Button
         mMap.getUiSettings().setMapToolbarEnabled(false); // Disables (button-right)button that is used to open Google Maps
-
         onMyLocationButtonClick();
 
         // POTENTIAL BUG - SHOULD INITTASK BE MOVED INTO onMapReady() ??1
@@ -249,6 +256,7 @@ public class MapsFragment extends Fragment implements
         ((MainActivity)getActivity()).fab.show(); //getTaxi(getSrcLoc(), destLoc);
 
         barSearch.setVisibility(View.GONE);
+        hideKeyboard();
         return false;
     }
 
@@ -256,12 +264,14 @@ public class MapsFragment extends Fragment implements
     public void onMapClick(LatLng latLng) {
         ((MainActivity)getActivity()).fab.hide();
         barSearch.setVisibility(View.VISIBLE);
+        hideKeyboard();
     }
 
     @Override
     public void onClick(View v) {
         int id = v.getId();
         if(id == R.id.button_search) {
+            hideKeyboard();
             ArrayList<String> inputList = new ArrayList<String>();
             inputList.add(inputSearch.getText().toString());
             getActivity().findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
@@ -322,9 +332,17 @@ public class MapsFragment extends Fragment implements
         Log.d("SLIC", s);
     }
 
+    protected void hideKeyboard() {
+        View view = getActivity().getCurrentFocus();
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
     public static class SpellChecker {
 
-        private static final int NANO_TIMEOUT = 2000000000;
+        private static final int NANO_TIMEOUT = 2000000;
         private long started, time;
         public List<String> locations = null;
         public boolean isDone = false;
@@ -386,7 +404,7 @@ public class MapsFragment extends Fragment implements
         }
 
         public boolean checkTimeout(){
-            time = System.nanoTime();
+            time = System.currentTimeMillis();
             long timeTaken= time - started;
             if(timeTaken > NANO_TIMEOUT) {
                 Log.d("SLIC", "Time: " + timeTaken);
@@ -398,7 +416,7 @@ public class MapsFragment extends Fragment implements
 
         public String spellcorrector(String word){
             isDone = false;
-            started = System.nanoTime();
+            started = System.currentTimeMillis();
             word = word.replaceAll(" ", "");
             word = word.toLowerCase();
             //locationGenerator();
