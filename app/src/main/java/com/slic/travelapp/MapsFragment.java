@@ -57,7 +57,7 @@ public class MapsFragment extends Fragment implements
     private GoogleMap mMap;
     private Geocoder myGcdr;
 
-    private static ArrayList<Marker> markerList = new ArrayList<Marker>();
+    private static Marker lastMarker = null;
     private static ArrayList<LatLng> geoList;
     private static ArrayList<String> locationList;
     private static SpellChecker spellChecker;
@@ -213,35 +213,17 @@ public class MapsFragment extends Fragment implements
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.position(point).title(name);
 
-        markerList.add(mMap.addMarker(markerOptions));
+        lastMarker = mMap.addMarker(markerOptions);
         shout("Draw @ " + point.toString());
     }
 
     public static void toggleMarkers(){
-        if(markerList != null){
-            if(!markerList.isEmpty()){
-                if(markerList.get(0).isInfoWindowShown())
-                    setMarkersVisibility(false);
-                else
-                    setMarkersVisibility(true);
-            } shout("ToggleMarkers: Marker list is empty");
-        } else
-            shout("ToggleMarkers: Marker list is null");
-
-
-    }
-    private static void setMarkersVisibility(boolean Visible) {
-        if(Visible){
-            for(int i = 0; i < markerList.size(); i++) {
-                markerList.get(i).showInfoWindow();
-            }
+        if(lastMarker!=null){
+            if(lastMarker.isInfoWindowShown())
+                lastMarker.hideInfoWindow();
+            else
+                lastMarker.showInfoWindow();
         }
-        else {
-            for(int i = 0; i < markerList.size(); i++) {
-                markerList.get(i).hideInfoWindow();
-            }
-        }
-
     }
 
     @Override
@@ -302,6 +284,7 @@ public class MapsFragment extends Fragment implements
         int id = v.getId();
         if(id == R.id.button_search) {
             hideKeyboard();
+            ((MainActivity)getActivity()).showMarkerMenuItem();
             ArrayList<String> inputList = new ArrayList<String>();
             inputList.add(inputSearch.getText().toString());
             new CheckTask().execute(inputList, null, null);

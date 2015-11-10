@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements
     //private ArrayList<String> checkedAttractions = new ArrayList<>();
     private ArrayList<String> itineraryDestinations = new ArrayList<String>();
     public static ArrayList<String> itemList = new ArrayList<String>();
-    private Menu menu = null;
+    private static Menu menu = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -200,10 +200,8 @@ public class MainActivity extends AppCompatActivity implements
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
-        menu.findItem(R.id.action_settings).setVisible(false); // Disable setting menu
-        menu.findItem(R.id.action_delete).setVisible(false);
-        menu.findItem(R.id.action_marker).setVisible(false);
         this.menu = menu;
+        hideAllMenuItem();
         return true;
     }
 
@@ -254,9 +252,8 @@ public class MainActivity extends AppCompatActivity implements
 
         // Handle navigation view item clicks here.
         fab.hide();
-        if(this.menu != null) {
-            this.menu.findItem(R.id.action_delete).setVisible(false);
-            this.menu.findItem(R.id.action_marker).setVisible(false);
+        if(menu != null) {
+            hideAllMenuItem();
             shout("Menu updated");
         }
 
@@ -265,10 +262,6 @@ public class MainActivity extends AppCompatActivity implements
             bundle.putStringArrayList("LOCLIST", itineraryDestinations);
             fragment = new MapsFragment();
             fragment.setArguments(bundle);
-            if(this.menu != null) {
-                this.menu.findItem(R.id.action_marker).setVisible(true);
-                shout("Menu updated");
-            }
         } else if (id == R.id.nav_plan) {
             // Hides fragment layers, Show Tab and Pager
             findViewById(R.id.tabs).setVisibility(View.VISIBLE);
@@ -281,8 +274,8 @@ public class MainActivity extends AppCompatActivity implements
         } */
         else if (id == R.id.nav_item) {
             fragment = new ItemsFragment();
-            if(this.menu != null) {
-                this.menu.findItem(R.id.action_delete).setVisible(true);
+            if(menu != null) {
+                showDeleteMenuItem();
                 shout("Menu updated");
             }
         } else if (id == R.id.nav_contacts) {
@@ -373,6 +366,18 @@ public class MainActivity extends AppCompatActivity implements
             i.setData(Uri.parse(url));
             startActivity(i);
         }
+    }
+
+    public void hideAllMenuItem(){
+        menu.findItem(R.id.action_settings).setVisible(false);
+        menu.findItem(R.id.action_delete).setVisible(false);
+        menu.findItem(R.id.action_marker).setVisible(false);
+    }
+    public void showMarkerMenuItem(){
+        menu.findItem(R.id.action_marker).setVisible(true);
+    }
+    public void showDeleteMenuItem() {
+        menu.findItem(R.id.action_delete).setVisible(true);
     }
 
     private void shout(String s) {
