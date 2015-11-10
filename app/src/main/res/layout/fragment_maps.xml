@@ -45,5 +45,13 @@
             android:layout_marginBottom="2dp" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/grey_screen"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:background="#B0000000"
+        android:visibility="gone">
+    </LinearLayout>
+
 
 </RelativeLayout>

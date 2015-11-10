@@ -1,4 +1,5 @@
 package com.slic.travelapp.ItinearyComponents;
+
 /**
  * Created by Jiayu on 06/11/2015.
  */

@@ -60,7 +60,7 @@ public class ApiRequest {
             public void success(WeatherResponse weatherResponse, Response response) {
                 String id = weatherResponse.getWeather()[0].getId();
                 shout(id);
-                int code = Integer.valueOf(id.charAt(0));
+                int code = Integer.parseInt(id.substring(0,1));
                 if(id.charAt(0) == '9' && id.charAt(1) == '0')
                     code = 4;
 

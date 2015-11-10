@@ -30,6 +30,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,10 +39,13 @@ import com.google.android.gms.maps.model.LatLng;
 import com.slic.travelapp.ItinearyComponents.AttractionsFragment;
 import com.slic.travelapp.ItinearyComponents.BudgetFragment;
 import com.slic.travelapp.ItinearyComponents.ItineraryFragment;
+import com.slic.travelapp.ItinearyComponents.Routes;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 
@@ -61,7 +65,7 @@ public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
         BudgetFragment.OnFragmentInteractionListener,
         AttractionsFragment.OnFragmentInteractionListener,
-        ItineraryFragment.OnFragmentInteractionListener{
+        ItineraryFragment.OnFragmentInteractionListener {
 
     private static final int REQUEST_LOCATION = 1;
     private static final String FILE_PATH = "location_cache.dat";
@@ -71,12 +75,19 @@ public class MainActivity extends AppCompatActivity implements
     private static LatLng destLoc = null;
     private static String destName = null;
 
-    private SectionsPagerAdapter mSectionsPagerAdapter;
     private ViewPager mViewPager;
-    ArrayList<String> checkedAttractions = new ArrayList<>();
-    int budget;
-    String hotel;
-    boolean itineraryExhaustiveEnumeration = true;
+    private SectionsPagerAdapter mSectionsPagerAdapter;
+    private BudgetFragment budgetFragment;
+    private AttractionsFragment attractionsFragment;
+    private ItineraryFragment itineraryFragment;
+
+    private int budget;
+    private String hotel;
+    private boolean itineraryExhaustiveEnumeration;
+    //private ArrayList<String> checkedAttractions = new ArrayList<>();
+    private ArrayList<String> itineraryDestinations = new ArrayList<String>();
+    public static ArrayList<String> itemList = new ArrayList<String>();
+    private Menu menu = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,13 +131,25 @@ public class MainActivity extends AppCompatActivity implements
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
+
+        // Create the adapter that will return a fragment for each of the three
+        // primary sections of the activity.
         mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
+        // Set up the ViewPager with the sections adapter.
         mViewPager = (ViewPager) findViewById(R.id.view_container);
         mViewPager.setAdapter(mSectionsPagerAdapter);
+        mViewPager.setOffscreenPageLimit(2);
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
         tabLayout.setupWithViewPager(mViewPager);
 
+        try (InputStream fileInputStream = getResources().openRawResource(R.raw.attractions)) {
+            Routes.generateRoutes(fileInputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         launchFragment(R.id.nav_home); // Initialize screen to the choosen fragment
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN); // Prevents keyboard froum auto launching
     }
 
     private void checkSelfPermission() {
@@ -150,7 +173,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_LOCATION) {
-            if(grantResults.length == 1
+            if (grantResults.length == 1
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // We can now safely use the API we requested access to
 //                Location myLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
@@ -178,7 +201,9 @@ public class MainActivity extends AppCompatActivity implements
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         menu.findItem(R.id.action_settings).setVisible(false); // Disable setting menu
-
+        menu.findItem(R.id.action_delete).setVisible(false);
+        menu.findItem(R.id.action_marker).setVisible(false);
+        this.menu = menu;
         return true;
     }
 
@@ -192,6 +217,11 @@ public class MainActivity extends AppCompatActivity implements
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
+        } else if(id == R.id.action_delete) {
+            itemList.clear();
+            ItemsFragment.updateSet();
+        } else if(id == R.id.action_marker) {
+            MapsFragment.toggleMarkers();
         }
 
         return super.onOptionsItemSelected(item);
@@ -224,22 +254,39 @@ public class MainActivity extends AppCompatActivity implements
 
         // Handle navigation view item clicks here.
         fab.hide();
+        if(this.menu != null) {
+            this.menu.findItem(R.id.action_delete).setVisible(false);
+            this.menu.findItem(R.id.action_marker).setVisible(false);
+            shout("Menu updated");
+        }
+
         if (id == R.id.nav_home) {
-            bundle.putStringArrayList("LOCLIST", retrieveLocation());
+//            bundle.putStringArrayList("LOCLIST", retrieveLocation());
+            bundle.putStringArrayList("LOCLIST", itineraryDestinations);
             fragment = new MapsFragment();
             fragment.setArguments(bundle);
-        }else if (id == R.id.nav_plan) {
+            if(this.menu != null) {
+                this.menu.findItem(R.id.action_marker).setVisible(true);
+                shout("Menu updated");
+            }
+        } else if (id == R.id.nav_plan) {
             // Hides fragment layers, Show Tab and Pager
             findViewById(R.id.tabs).setVisibility(View.VISIBLE);
             findViewById(R.id.view_container).setVisibility(View.VISIBLE);
             findViewById(R.id.fragment_container).setVisibility(View.GONE);
 
-        } else if (id == R.id.nav_find) {
+        }
+/*        else if (id == R.id.nav_find) {
             fragment = new FindFragment();
-        } else if (id == R.id.nav_item) {
+        } */
+        else if (id == R.id.nav_item) {
             fragment = new ItemsFragment();
-        } else if (id == R.id.nav_share) {
-        } else if (id == R.id.nav_send) {
+            if(this.menu != null) {
+                this.menu.findItem(R.id.action_delete).setVisible(true);
+                shout("Menu updated");
+            }
+        } else if (id == R.id.nav_contacts) {
+        } else if (id == R.id.nav_feedback) {
         }
 
         if (fragment != null) {
@@ -257,17 +304,17 @@ public class MainActivity extends AppCompatActivity implements
         ArrayList<String> locationList = new ArrayList<String>();
 
         StringBuilder sb = new StringBuilder();
-        try{
+        try {
             File f = new File(FILE_PATH);
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f)));
             String line;
-            while((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null) {
                 //System.out.println(line);
-                sb.append(line+"\n");
+                sb.append(line + "\n");
             }
-            for(String loc: sb.toString().split("\n"))
+            for (String loc : sb.toString().split("\n"))
                 locationList.add(loc);
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             locationList.add("Sentosa");
             locationList.add("Woodlands Singapore");
@@ -277,19 +324,22 @@ public class MainActivity extends AppCompatActivity implements
         return locationList;
     }
 
-    public void setSrc(LatLng loc){
+    public void setSrc(LatLng loc) {
         srcLoc = loc;
         shout("SRC: " + srcLoc.toString());
     }
-    public void setDest(LatLng loc){
+
+    public void setDest(LatLng loc) {
         destLoc = loc;
         shout("DEST: " + destLoc.toString());
     }
+
     public void setName(String s) {
         destName = s;
         shout("Name: " + destName.toString());
     }
-    public void clearLoc(){
+
+    public void clearLoc() {
         srcLoc = new LatLng(0, 0);
         destLoc = new LatLng(0, 0);
         destName = "";
@@ -330,49 +380,50 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void onBudgetUpdated(int budget, String hotel, boolean exhaustiveMode) {
-        Toast.makeText(this, String.valueOf(budget), Toast.LENGTH_SHORT).show();
-
-        this.budget = budget;
-        this.hotel = hotel;
-        this.itineraryExhaustiveEnumeration = exhaustiveMode;
-
-        mSectionsPagerAdapter.notifyDataSetChanged();
-
-        hideKeyboard();
-
-        ((ViewPager) findViewById(R.id.view_container)).setCurrentItem(1);
+    public void getItineraryDestinations(ArrayList<String> itineraryDestinations) {
+        this.itineraryDestinations = itineraryDestinations;
     }
+
 
     @Override
     public void onAttractionsSelected(ArrayList<String> selectedAttractions) {
-        shout("onAttractions in");
-        this.checkedAttractions = selectedAttractions;
-
-        //mSectionsPagerAdapter.notifyDataSetChanged();
-
-        shout("onAttractions done");
-
-        String checkedAttractionsString = "";
-        for (String selectedAttraction :
-                selectedAttractions) {
-            checkedAttractionsString += " " + selectedAttraction;
+        Log.i("MainActivity", "Attraction selected");
+        if (itineraryFragment != null) {
+            itineraryFragment.updateItinerary(selectedAttractions);
         }
-
-        Toast.makeText(this, checkedAttractionsString, Toast.LENGTH_SHORT).show();
-        shout(checkedAttractionsString);
     }
 
     @Override
-    public void onFragmentInteraction(String id) {
+    public void onBudgetUpdated(int budget) {
+        Log.i("MainActivity", "Budget updated: " + String.valueOf(budget));
+        this.budget = budget;
+        if (itineraryFragment != null) {
+            itineraryFragment.updateItinerary(budget);
+        }
+    }
+
+    @Override
+    public void onHotelUpdated(String hotel) {
+        Log.i("MainActivity", "Hotel updated to " + hotel);
+        this.hotel = hotel;
+        if (attractionsFragment != null) {
+            attractionsFragment.updateHotel(hotel);
+        }
+        if (itineraryFragment != null) {
+            itineraryFragment.updateItinerary(hotel);
+        }
 
     }
 
+    @Override
+    public void onSearchModeUpdated(boolean exhaustiveMode) {
+        Log.i("MainActivity", "Exhaustive mode set to " + String.valueOf(exhaustiveMode));
+        this.itineraryExhaustiveEnumeration = exhaustiveMode;
+        if (itineraryFragment != null) {
+            itineraryFragment.updateItinerary(exhaustiveMode);
+        }
+    }
 
-    /**
-     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
-     * one of the sections/tabs/pages.
-     */
     public class SectionsPagerAdapter extends FragmentPagerAdapter {
 
         private final FragmentManager mFragmentManager;
@@ -383,31 +434,39 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         @Override
-        public int getItemPosition(Object object) {
-            if (object instanceof ItineraryFragment) {
-                mFragmentManager.beginTransaction().remove((Fragment) object).commit();
-                Log.i("MyActivity", "Destroying ItineraryFragment");
-                return POSITION_NONE;
-            } else {
-                return super.getItemPosition(object);
-            }
-        }
-
-        @Override
         public Fragment getItem(int position) {
             // getItem is called to instantiate the fragment for the given page.
             switch (position) {
                 case 0:
-                    return BudgetFragment.newInstance("", "");
+                    return BudgetFragment.newInstance();
                 case 1:
-                    return AttractionsFragment.newInstance("", "");
+                    return AttractionsFragment.newInstance();
                 case 2:
-                    Log.i("MyActivity", "getItem is called for ItineraryFragment");
-                    return ItineraryFragment.newInstance(budget, checkedAttractions, itineraryExhaustiveEnumeration);
+                    return ItineraryFragment.newInstance();
                 default:
                     // Return a PlaceholderFragment (defined as a static inner class below).
                     return PlaceholderFragment.newInstance(position + 1);
             }
+        }
+
+        @Override
+        public Object instantiateItem(ViewGroup container, int position) {
+            Fragment createdFragment = (Fragment) super.instantiateItem(container, position);
+            // save the appropriate reference depending on position
+            switch (position) {
+                case 0:
+                    budgetFragment = (BudgetFragment) createdFragment;
+                    Log.i("instantiateItem", "Created BudgetFragment");
+                    break;
+                case 1:
+                    attractionsFragment = (AttractionsFragment) createdFragment;
+                    Log.i("instantiateItem", "Created AttractionsFragment");
+                    break;
+                case 2:
+                    itineraryFragment = (ItineraryFragment) createdFragment;
+                    Log.i("instantiateItem", "Created ItineraryFragment");
+            }
+            return createdFragment;
         }
 
         @Override

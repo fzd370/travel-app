@@ -1,9 +1,10 @@
 package com.slic.travelapp.ItinearyComponents;
+
 /**
  * Created by Jiayu on 06/11/2015.
  */
 public enum TransportMode {
-    TAXI, PUBLIC_TRANSPORT, FOOT;
+    PUBLIC_TRANSPORT, TAXI, FOOT;
 
     static TransportMode getTransportMode(String transportMode) {
         switch (transportMode) {

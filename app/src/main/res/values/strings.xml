@@ -7,4 +7,6 @@
     <string name="section_format">Hello World from section: %1$d</string>
     <string name="action_settings">Settings</string>
     <string name="action_search">Search Location</string>
+    <string name="action_delete">Clear Items</string>
+    <string name="action_marker">Toggle Markers</string>
 </resources>

@@ -1,4 +1,5 @@
 package com.slic.travelapp.ItinearyComponents;
+
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;

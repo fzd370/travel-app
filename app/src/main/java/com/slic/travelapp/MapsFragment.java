@@ -17,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -35,6 +36,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -55,6 +57,7 @@ public class MapsFragment extends Fragment implements
     private GoogleMap mMap;
     private Geocoder myGcdr;
 
+    private static ArrayList<Marker> markerList = new ArrayList<Marker>();
     private static ArrayList<LatLng> geoList;
     private static ArrayList<String> locationList;
     private static SpellChecker spellChecker;
@@ -66,7 +69,6 @@ public class MapsFragment extends Fragment implements
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_maps, container, false);
-
         Bundle bundle = this.getArguments();
         try{
             if(bundle != null) {
@@ -133,7 +135,7 @@ public class MapsFragment extends Fragment implements
         shout("LOCLIST : " + locationList.toString());
         try {
             for(int i = 0; i < locationList.size(); i++) {
-                List<Address> matched = myGcdr.getFromLocationName(locationList.get(i), 1);
+                List<Address> matched = myGcdr.getFromLocationName("Singapore " + locationList.get(i), 1);
                 matchedList.add(matched);
             }
             shout("MATCHLIST : " + matchedList.toString());
@@ -160,7 +162,7 @@ public class MapsFragment extends Fragment implements
     public LatLng getLatLng(String locationName) {
         LatLng loc = null;
         try {
-            List<Address> matches = myGcdr.getFromLocationName(locationName, 1);
+            List<Address> matches = myGcdr.getFromLocationName("Singapore " +locationName, 1);
             double lat = matches.get(0).getLatitude();
             double lon = matches.get(0).getLongitude();
             loc = new LatLng(lat, lon);
@@ -210,8 +212,36 @@ public class MapsFragment extends Fragment implements
     private void drawMarker(LatLng point, String name) {
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.position(point).title(name);
-        mMap.addMarker(markerOptions);
+
+        markerList.add(mMap.addMarker(markerOptions));
         shout("Draw @ " + point.toString());
+    }
+
+    public static void toggleMarkers(){
+        if(markerList != null){
+            if(!markerList.isEmpty()){
+                if(markerList.get(0).isInfoWindowShown())
+                    setMarkersVisibility(false);
+                else
+                    setMarkersVisibility(true);
+            } shout("ToggleMarkers: Marker list is empty");
+        } else
+            shout("ToggleMarkers: Marker list is null");
+
+
+    }
+    private static void setMarkersVisibility(boolean Visible) {
+        if(Visible){
+            for(int i = 0; i < markerList.size(); i++) {
+                markerList.get(i).showInfoWindow();
+            }
+        }
+        else {
+            for(int i = 0; i < markerList.size(); i++) {
+                markerList.get(i).hideInfoWindow();
+            }
+        }
+
     }
 
     @Override
@@ -274,7 +304,6 @@ public class MapsFragment extends Fragment implements
             hideKeyboard();
             ArrayList<String> inputList = new ArrayList<String>();
             inputList.add(inputSearch.getText().toString());
-            getActivity().findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
             new CheckTask().execute(inputList, null, null);
         }
     }
@@ -297,6 +326,16 @@ public class MapsFragment extends Fragment implements
     }
 
     private class CheckTask extends AsyncTask<ArrayList<String>, Integer, Integer> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            getActivity().getWindow().setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+            getActivity().findViewById(R.id.grey_screen).setVisibility(View.VISIBLE);
+            getActivity().findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+        }
+
         @Override
         protected Integer doInBackground(ArrayList<String>... params) {
             // Enable loading bar
@@ -319,16 +358,18 @@ public class MapsFragment extends Fragment implements
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(loc, 11));
                 inputSearch.setText(locationReplace);
                 shout("CheckTask Sucess");
-
-                getActivity().findViewById(R.id.progressBar).setVisibility(View.GONE);
             } catch (Exception e){
                 e.printStackTrace();
                 shout("CheckTask Fail");
+            } finally {
+                getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE); // Disable user's touch
+                getActivity().findViewById(R.id.grey_screen).setVisibility(View.GONE);               // Set grey background
+                getActivity().findViewById(R.id.progressBar).setVisibility(View.GONE);               // Bring up progress bar
             }
         }
     }
 
-    private void shout(String s) {
+    private static void shout(String s) {
         Log.d("SLIC", s);
     }
 
@@ -342,7 +383,7 @@ public class MapsFragment extends Fragment implements
 
     public static class SpellChecker {
 
-        private static final int NANO_TIMEOUT = 2000000;
+        private static final int MS_TIMEOUT = 5000;
         private long started, time;
         public List<String> locations = null;
         public boolean isDone = false;
@@ -406,8 +447,8 @@ public class MapsFragment extends Fragment implements
         public boolean checkTimeout(){
             time = System.currentTimeMillis();
             long timeTaken= time - started;
-            if(timeTaken > NANO_TIMEOUT) {
-                Log.d("SLIC", "Time: " + timeTaken);
+            if(timeTaken >= MS_TIMEOUT) {
+                Log.d("SLIC", "Timeout : " + timeTaken);
                 isDone = true;
                 return true;
             }
@@ -424,7 +465,10 @@ public class MapsFragment extends Fragment implements
             for (int i = 0; i < locations.size(); i++){
                 String loc = locations.get(i).replaceAll(" ","");
                 locations1.add(loc.toLowerCase());
-                if(checkTimeout()) return null;
+                if(checkTimeout()) {
+                    Log.d("SLIC", "Check Time 1");
+                    return null;
+                }
             }
             if (locations1.contains(word)){return locations.get(locations1.indexOf(word));}
             List<String> possiblewords1 = typos1(word);
@@ -435,7 +479,10 @@ public class MapsFragment extends Fragment implements
                     if (m.find()){
                         return locations.get(locations1.indexOf(location));
                     }
-                    if(checkTimeout()) return null;
+                }
+                if(checkTimeout()) {
+                    Log.d("SLIC", "Check Time 2");
+                    return null;
                 }
             }
             List<String> possiblewords2 = typos2(possiblewords1);
@@ -446,7 +493,10 @@ public class MapsFragment extends Fragment implements
                     if (m.find()){
                         return locations.get(locations1.indexOf(location));
                     }
-                    if(checkTimeout()) return null;
+                }
+                if(checkTimeout()) {
+                    Log.d("SLIC", "Check Time 3");
+                    return null;
                 }
             }
             isDone = true;

@@ -1,4 +1,5 @@
 package com.slic.travelapp.ItinearyComponents;
+
 import android.util.JsonReader;
 
 import java.io.IOException;
@@ -19,7 +20,7 @@ public class Routes {
         return Routes.routes.get(new RouteInfoKey(transportMode, origin, destination)).time;
     }
 
-    static void generateRoutes(InputStream jsonInputStream) throws IOException {
+    public static void generateRoutes(InputStream jsonInputStream) throws IOException {
         JsonReader jsonReader = new JsonReader(new InputStreamReader(jsonInputStream, "UTF-8"));
         jsonReader.beginObject();
         while (jsonReader.hasNext()) {

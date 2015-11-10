@@ -1,20 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:layout_width="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
     android:layout_height="match_parent">
 
 
     <LinearLayout
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="0.3"
         android:weightSum="1">
         <ImageView
-            android:id="@+id/image_weather1"
-            android:layout_width="0dp"
+            android:id="@+id/image_weather"
+            android:layout_width="match_parent"
             android:layout_weight="1"
-            android:layout_height="match_parent" />
+            android:layout_height="0dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:layout_gravity="center_horizontal"
+            android:text="Weather Status"
+            android:id="@+id/text_weather" />
+
 
     </LinearLayout>
 
@@ -24,10 +35,12 @@
         android:layout_height="0dp"
         android:layout_weight="0.7">
         <ListView
-            android:layout_width="wrap_content"
+            android:id="@+id/item_list"
             android:layout_height="wrap_content"
-            android:id="@+id/listView" />
+            android:layout_width="match_parent">
+        </ListView>
     </LinearLayout>
+
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -43,7 +56,7 @@
             android:layout_marginLeft="10dp"
             android:layout_marginStart="10dp"
             android:layout_centerVertical="true"
-            android:layout_toLeftOf="@+id/button_add"
+            android:layout_toLeftOf="@+id/button_item_add"
             android:layout_alignParentLeft="true"
             android:layout_alignParentStart="false" />
 
@@ -51,7 +64,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Add"
-            android:id="@+id/button_add"
+            android:id="@+id/button_item_add"
             android:layout_margin="10dp"
             android:layout_centerVertical="true"
             android:layout_alignParentRight="true"
