@@ -88,11 +88,8 @@ public class MapsFragment extends Fragment implements
         buttonSearch = (Button) rootView.findViewById(R.id.button_search);
         buttonSearch.setOnClickListener(this);
         barSearch = (LinearLayout) rootView.findViewById(R.id.bar_search);
-        View mFragment = rootView.findViewById(R.id.map);
-        //mFragment.setOnTouchListener(this);
 
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
-
         mapFragment.getMapAsync(this);
 
         return rootView;
@@ -114,13 +111,13 @@ public class MapsFragment extends Fragment implements
                 == PackageManager.PERMISSION_GRANTED) {
             mMap.setMyLocationEnabled(true);
         } else {
-            Toast.makeText(getContext(), "NEED PERMISSION", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), "NEED PERMISSION FOR MAPS TO FUNCTION CORRECTLY", Toast.LENGTH_LONG).show();
         }
 
         mMap.setOnMarkerClickListener(this);              // Used to show Taxi Button
         mMap.setOnMapClickListener(this);                 // Used to hide Taxi Button
         mMap.getUiSettings().setMapToolbarEnabled(false); // Disables (button-right)button that is used to open Google Maps
-        onMyLocationButtonClick();
+        onMyLocationButtonClick();                        // Defaults current view to user's location
 
         // POTENTIAL BUG - SHOULD INITTASK BE MOVED INTO onMapReady() ??1
         new InitTask().execute(locationList, null, null);    // Parse information into Initializer(String -> GeoCode -> Place markers)
@@ -239,7 +236,7 @@ public class MapsFragment extends Fragment implements
             return new LatLng(location.getLatitude(), location.getLongitude());
         } catch (Exception e) {
             e.printStackTrace();
-            shout("Unable to get Current Location. Defaulting to SoMaPaH");
+            shout("Unable to get Current Location. Defaulting to SUTD");
             return new LatLng(1.340103, 103.962955);
         }
     }
@@ -286,8 +283,11 @@ public class MapsFragment extends Fragment implements
             hideKeyboard();
             ((MainActivity)getActivity()).showMarkerMenuItem();
             ArrayList<String> inputList = new ArrayList<String>();
-            inputList.add(inputSearch.getText().toString());
-            new CheckTask().execute(inputList, null, null);
+            String inputText = inputSearch.getText().toString();
+            if(inputText.length()>0){
+                inputList.add(inputText.toString());
+                new CheckTask().execute(inputList, null, null);
+            }
         }
     }
 
@@ -324,7 +324,13 @@ public class MapsFragment extends Fragment implements
             // Enable loading bar
 
             String locationInput = params[0].get(0);
-            locationReplace = spellChecker.spellcorrector(locationInput);
+            try{
+                locationReplace = spellChecker.spellcorrector(locationInput);
+            }catch (Exception e){
+                e.printStackTrace();
+                shout("Spellcheck Corrector failed");
+            }
+
             if(locationReplace == null) {
                 shout("No match found!");
                 locationReplace = locationInput;
@@ -366,6 +372,7 @@ public class MapsFragment extends Fragment implements
 
     public static class SpellChecker {
 
+        private static final boolean ALLOW_TIMEOUT = false;
         private static final int MS_TIMEOUT = 5000;
         private long started, time;
         public List<String> locations = null;
@@ -428,12 +435,14 @@ public class MapsFragment extends Fragment implements
         }
 
         public boolean checkTimeout(){
-            time = System.currentTimeMillis();
-            long timeTaken= time - started;
-            if(timeTaken >= MS_TIMEOUT) {
-                Log.d("SLIC", "Timeout : " + timeTaken);
-                isDone = true;
-                return true;
+            if(ALLOW_TIMEOUT){
+                time = System.currentTimeMillis();
+                long timeTaken= time - started;
+                if(timeTaken >= MS_TIMEOUT) {
+                    Log.d("SLIC", "Timeout : " + timeTaken);
+                    isDone = true;
+                    return true;
+                }
             }
             return false;
         }

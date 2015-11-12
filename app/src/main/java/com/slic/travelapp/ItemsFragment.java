@@ -93,8 +93,7 @@ public class ItemsFragment extends Fragment implements
             }
         });
 
-
-        Toast.makeText(getContext(),"Press and hold on item to remove", Toast.LENGTH_LONG).show();
+        ((MainActivity) getActivity()).showItemAlert();
         return rootView;
     }
 

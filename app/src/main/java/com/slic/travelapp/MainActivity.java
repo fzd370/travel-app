@@ -1,11 +1,14 @@
 package com.slic.travelapp;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.design.internal.NavigationMenuPresenter;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
@@ -32,6 +35,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +52,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 /* Travel App
@@ -70,6 +76,8 @@ public class MainActivity extends AppCompatActivity implements
     private static final int REQUEST_LOCATION = 1;
     private static final String FILE_PATH = "location_cache.dat";
     private static final String CLIENT_ID = "475054250915-pjo5gu01j8hjc2dnab0qg4prra4ocljc.apps.googleusercontent.com";
+    private static boolean shownItemAlert = false;
+    private static boolean shownMapAlert = false;
     public FloatingActionButton fab;
     private static LatLng srcLoc = null;
     private static LatLng destLoc = null;
@@ -87,6 +95,8 @@ public class MainActivity extends AppCompatActivity implements
     //private ArrayList<String> checkedAttractions = new ArrayList<>();
     private ArrayList<String> itineraryDestinations = new ArrayList<String>();
     public static ArrayList<String> itemList = new ArrayList<String>();
+
+    private static NavigationView navigationView = null;
     private static Menu menu = null;
 
     @Override
@@ -115,6 +125,7 @@ public class MainActivity extends AppCompatActivity implements
         findViewById(R.id.progressBar).setVisibility(View.GONE);    // Disable Progress bar
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.setDrawerListener(toggle);
@@ -128,9 +139,8 @@ public class MainActivity extends AppCompatActivity implements
         });
         toggle.syncState();
 
-        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+        navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
-
 
         // Create the adapter that will return a fragment for each of the three
         // primary sections of the activity.
@@ -215,10 +225,10 @@ public class MainActivity extends AppCompatActivity implements
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
-        } else if(id == R.id.action_delete) {
+        } else if (id == R.id.action_delete) {
             itemList.clear();
             ItemsFragment.updateSet();
-        } else if(id == R.id.action_marker) {
+        } else if (id == R.id.action_marker) {
             MapsFragment.toggleMarkers();
         }
 
@@ -252,13 +262,14 @@ public class MainActivity extends AppCompatActivity implements
 
         // Handle navigation view item clicks here.
         fab.hide();
-        if(menu != null) {
+        if (menu != null) {
             hideAllMenuItem();
             shout("Menu updated");
         }
 
         if (id == R.id.nav_home) {
 //            bundle.putStringArrayList("LOCLIST", retrieveLocation());
+            hideMapNotification();
             bundle.putStringArrayList("LOCLIST", itineraryDestinations);
             fragment = new MapsFragment();
             fragment.setArguments(bundle);
@@ -269,17 +280,16 @@ public class MainActivity extends AppCompatActivity implements
             findViewById(R.id.fragment_container).setVisibility(View.GONE);
 
         }
-/*        else if (id == R.id.nav_find) {
-            fragment = new FindFragment();
-        } */
         else if (id == R.id.nav_item) {
             fragment = new ItemsFragment();
-            if(menu != null) {
+            if (menu != null) {
                 showDeleteMenuItem();
                 shout("Menu updated");
             }
         } else if (id == R.id.nav_contacts) {
+            startContacts();
         } else if (id == R.id.nav_feedback) {
+            startFeedback();
         }
 
         if (fragment != null) {
@@ -291,30 +301,6 @@ public class MainActivity extends AppCompatActivity implements
             fragmentTransaction.replace(R.id.container_body, fragment);
             fragmentTransaction.commit();
         }
-    }
-
-    public static ArrayList<String> retrieveLocation() {
-        ArrayList<String> locationList = new ArrayList<String>();
-
-        StringBuilder sb = new StringBuilder();
-        try {
-            File f = new File(FILE_PATH);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f)));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                //System.out.println(line);
-                sb.append(line + "\n");
-            }
-            for (String loc : sb.toString().split("\n"))
-                locationList.add(loc);
-        } catch (Exception e) {
-            e.printStackTrace();
-            locationList.add("Sentosa");
-            locationList.add("Woodlands Singapore");
-            locationList.add("Orchard Singapore");
-            locationList.add("Changi Village Singapore");
-        }
-        return locationList;
     }
 
     public void setSrc(LatLng loc) {
@@ -368,14 +354,65 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    public void hideAllMenuItem(){
+    public void startFeedback() {
+        Intent intent = new Intent(this, FeedbackActivity.class);
+        startActivity(intent);
+    }
+
+    public void startContacts() {
+        Toast.makeText(this, "Contacts Activity Started", Toast.LENGTH_LONG).show();
+//        Intent intent = new Intent(this, ContactActivity.class);
+//        startActivity(intent);
+    }
+
+    public void showItemAlert() {
+        if(!shownItemAlert){
+            AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
+            alertDialogueBuilder//.setTitle("Alert")
+                    .setMessage("Press and hold on an item to remove it.")
+                    .setPositiveButton("Got it!", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.cancel();
+                        }
+                    });
+            shownItemAlert = true;
+            alertDialogueBuilder.create().show();
+        }
+    }
+
+    public void showMapAlert() {
+        if(!shownMapAlert) {
+            AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
+            alertDialogueBuilder.setTitle("Alert")
+                    .setMessage("Location markers placed into map")
+                    .setNegativeButton("Got it!", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.cancel();
+                        }
+                    });
+            alertDialogueBuilder.create().show();
+            shownMapAlert = true;
+        }
+    }
+    public void showMapNotification(){
+        navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_home);
+    }
+    public void hideMapNotification(){
+        navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_blank);
+    }
+
+    public void hideAllMenuItem() {
         menu.findItem(R.id.action_settings).setVisible(false);
         menu.findItem(R.id.action_delete).setVisible(false);
         menu.findItem(R.id.action_marker).setVisible(false);
     }
-    public void showMarkerMenuItem(){
+
+    public void showMarkerMenuItem() {
         menu.findItem(R.id.action_marker).setVisible(true);
     }
+
     public void showDeleteMenuItem() {
         menu.findItem(R.id.action_delete).setVisible(true);
     }
@@ -387,6 +424,10 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void getItineraryDestinations(ArrayList<String> itineraryDestinations) {
         this.itineraryDestinations = itineraryDestinations;
+        if(!itineraryDestinations.isEmpty()){
+            Log.d("SLIC", "Destinations: " + itineraryDestinations);
+            showMapNotification();
+        }
     }
 
 

@@ -9,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
 
+import com.slic.travelapp.MainActivity;
 import com.slic.travelapp.R;
 
 import java.util.ArrayList;
@@ -82,6 +83,7 @@ public class ItineraryFragment extends ListFragment {
         listView.setSelector(android.R.color.transparent);
         listView.setDivider(null);
         listView.setDividerHeight(0);
+
         return listLayout;
     }
 
