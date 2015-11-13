@@ -372,7 +372,7 @@ public class MapsFragment extends Fragment implements
 
     public static class SpellChecker {
 
-        private static final boolean ALLOW_TIMEOUT = false;
+        private static final boolean ALLOW_TIMEOUT = true;
         private static final int MS_TIMEOUT = 5000;
         private long started, time;
         public List<String> locations = null;
@@ -438,7 +438,7 @@ public class MapsFragment extends Fragment implements
             if(ALLOW_TIMEOUT){
                 time = System.currentTimeMillis();
                 long timeTaken= time - started;
-                if(timeTaken >= MS_TIMEOUT) {
+                if(time - started >= MS_TIMEOUT) {
                     Log.d("SLIC", "Timeout : " + timeTaken);
                     isDone = true;
                     return true;

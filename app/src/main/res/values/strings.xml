@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">TravelApp</string>
     <string name="app_feedback_name">Feedback</string>
+    <string name="app_contacts_name">Useful Contacts</string>
     <string name="search_hint">Type to search for a location ....</string>
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
@@ -10,4 +11,11 @@
     <string name="action_search">Search Location</string>
     <string name="action_delete">Clear Items</string>
     <string name="action_marker">Toggle Markers</string>
+
+    <string name="fire">Fire Brigade - 995</string>
+    <string name="ambulance">Ambulance - 995</string>
+    <string name="police">Police - 999</string>
+    <string name="taxi">Taxi (City Cab) - 6552 2222</string>
+    <string name="KFC">KFC - 6777 3777</string>
+    <string name="call_text">Call</string>
 </resources>

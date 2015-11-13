@@ -360,9 +360,9 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void startContacts() {
-        Toast.makeText(this, "Contacts Activity Started", Toast.LENGTH_LONG).show();
-//        Intent intent = new Intent(this, ContactActivity.class);
-//        startActivity(intent);
+       // Toast.makeText(this, "Contacts Activity Started", Toast.LENGTH_LONG).show();
+        Intent intent = new Intent(this, ContactsActivity.class);
+        startActivity(intent);
     }
 
     public void showItemAlert() {
