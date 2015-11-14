@@ -589,11 +589,11 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public CharSequence getPageTitle(int position) {
             switch (position) {
-                case 1:
-                    return "BUDGET";
-                case 2:
-                    return "ATTRACTIONS";
                 case 0:
+                    return "BUDGET";
+                case 1:
+                    return "ATTRACTIONS";
+                case 2:
                     return "ITINERARY";
             }
             return null;
