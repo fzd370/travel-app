@@ -5,9 +5,12 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PersistableBundle;
+import android.preference.PreferenceManager;
 import android.support.design.internal.NavigationMenuPresenter;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
@@ -44,6 +47,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.slic.travelapp.ItinearyComponents.AttractionsFragment;
 import com.slic.travelapp.ItinearyComponents.BudgetFragment;
 import com.slic.travelapp.ItinearyComponents.ItineraryFragment;
+import com.slic.travelapp.ItinearyComponents.ItineraryItem;
 import com.slic.travelapp.ItinearyComponents.Routes;
 
 import java.io.BufferedReader;
@@ -54,6 +58,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 /* Travel App
 * Things to Accomplish                      Status
@@ -78,6 +84,8 @@ public class MainActivity extends AppCompatActivity implements
     private static final String CLIENT_ID = "475054250915-pjo5gu01j8hjc2dnab0qg4prra4ocljc.apps.googleusercontent.com";
     private static boolean shownItemAlert = false;
     private static boolean shownMapAlert = false;
+    private static boolean notificationTriggered = false;
+    private static boolean notificationShow = false;
     public FloatingActionButton fab;
     private static LatLng srcLoc = null;
     private static LatLng destLoc = null;
@@ -89,11 +97,13 @@ public class MainActivity extends AppCompatActivity implements
     private AttractionsFragment attractionsFragment;
     private ItineraryFragment itineraryFragment;
 
+    // state variables
     private int budget;
     private String hotel;
     private boolean itineraryExhaustiveEnumeration;
-    //private ArrayList<String> checkedAttractions = new ArrayList<>();
-    private ArrayList<String> itineraryDestinations = new ArrayList<String>();
+    private ArrayList<String> checkedAttractions;
+    private ArrayList<String> itineraryDestinations;
+    private ArrayList<ItineraryItem> savedItinerary;
     public static ArrayList<String> itemList = new ArrayList<String>();
 
     private static NavigationView navigationView = null;
@@ -102,6 +112,16 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            savedItinerary = savedInstanceState.getParcelableArrayList("ITINERARY");
+            notificationShow = savedInstanceState.getBoolean("NOTIFICATION");
+            shout("SAVEDItinerary: " + savedItinerary.toString());
+            shout("SAVEDNotification: " + String.valueOf(notificationShow));
+        } else {
+            shout("No saved state");
+        }
+        notificationTriggered = false;
+
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -207,6 +227,43 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putParcelableArrayList("ITINERARY", savedItinerary);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        savePreference();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadPreference();
+    }
+
+    public void savePreference() {
+        SharedPreferences.Editor editor =PreferenceManager.getDefaultSharedPreferences(this).edit();
+        editor.putBoolean("NOTIFICATION", notificationShow);
+        editor.commit();
+        shout("Notification: " + notificationShow);
+    }
+    public void loadPreference(){
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        if(prefs != null) {
+            notificationShow = prefs.getBoolean("NOTIFICATION", false);
+            shout("Notification: " + notificationShow);
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
@@ -264,7 +321,7 @@ public class MainActivity extends AppCompatActivity implements
         fab.hide();
         if (menu != null) {
             hideAllMenuItem();
-            shout("Menu updated");
+            //shout("Menu updated");
         }
 
         if (id == R.id.nav_home) {
@@ -284,7 +341,7 @@ public class MainActivity extends AppCompatActivity implements
             fragment = new ItemsFragment();
             if (menu != null) {
                 showDeleteMenuItem();
-                shout("Menu updated");
+                //shout("Menu updated");
             }
         } else if (id == R.id.nav_contacts) {
             startContacts();
@@ -398,9 +455,11 @@ public class MainActivity extends AppCompatActivity implements
     }
     public void showMapNotification(){
         navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_home);
+        notificationShow = true;
     }
     public void hideMapNotification(){
         navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_blank);
+        notificationShow = false;
     }
 
     public void hideAllMenuItem() {
@@ -422,20 +481,12 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void getItineraryDestinations(ArrayList<String> itineraryDestinations) {
-        this.itineraryDestinations = itineraryDestinations;
-        if(!itineraryDestinations.isEmpty()){
-            Log.d("SLIC", "Destinations: " + itineraryDestinations);
-            showMapNotification();
-        }
-    }
-
-
-    @Override
     public void onAttractionsSelected(ArrayList<String> selectedAttractions) {
         Log.i("MainActivity", "Attraction selected");
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(selectedAttractions);
+            if(notificationTriggered || notificationShow) showMapNotification();
+            notificationTriggered = true;
         }
     }
 
@@ -458,7 +509,6 @@ public class MainActivity extends AppCompatActivity implements
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(hotel);
         }
-
     }
 
     @Override
@@ -470,6 +520,21 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    @Override
+    public void getItineraryDestinations(ArrayList<String> itineraryDestinations) {
+        this.itineraryDestinations = itineraryDestinations;
+    }
+
+    @Override
+    public void updateSavedItinerary(ArrayList<ItineraryItem> route) {
+        this.savedItinerary = route;
+    }
+
+
+    /**
+     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
+     * one of the sections/tabs/pages.
+     */
     public class SectionsPagerAdapter extends FragmentPagerAdapter {
 
         private final FragmentManager mFragmentManager;
@@ -524,11 +589,11 @@ public class MainActivity extends AppCompatActivity implements
         @Override
         public CharSequence getPageTitle(int position) {
             switch (position) {
-                case 0:
-                    return "BUDGET";
                 case 1:
-                    return "ATTRACTIONS";
+                    return "BUDGET";
                 case 2:
+                    return "ATTRACTIONS";
+                case 0:
                     return "ITINERARY";
             }
             return null;

@@ -132,8 +132,6 @@ public class BudgetFragment extends Fragment {
             }
         });
 
-
-
 /*        editText2.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {

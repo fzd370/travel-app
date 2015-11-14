@@ -54,6 +54,8 @@ public class MapsFragment extends Fragment implements
         ActivityCompat.OnRequestPermissionsResultCallback,
         View.OnClickListener
 {
+    private static boolean DEBUG_MODE = false;
+
     private GoogleMap mMap;
     private Geocoder myGcdr;
 
@@ -75,6 +77,8 @@ public class MapsFragment extends Fragment implements
                 locationList = bundle.getStringArrayList("LOCLIST"); // Receives Location List that is read from file while in the Main Activity
                 if(locationList == null) {
                     locationList = new ArrayList<String>();
+                } else{
+                    locationList.remove(locationList.size()-1);
                 }
             }
         } catch (Exception e) {
@@ -359,7 +363,7 @@ public class MapsFragment extends Fragment implements
     }
 
     private static void shout(String s) {
-        Log.d("SLIC", s);
+        if(DEBUG_MODE) Log.d("SLIC", s);
     }
 
     protected void hideKeyboard() {
@@ -372,7 +376,7 @@ public class MapsFragment extends Fragment implements
 
     public static class SpellChecker {
 
-        private static final boolean ALLOW_TIMEOUT = true;
+        private static final boolean ALLOW_TIMEOUT = false;
         private static final int MS_TIMEOUT = 5000;
         private long started, time;
         public List<String> locations = null;
