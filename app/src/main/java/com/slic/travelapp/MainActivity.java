@@ -389,25 +389,23 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void clearItemAlert() {
-        if (!shownItemAlert) {
-            AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
-            alertDialogueBuilder//.setTitle("Alert")
-                    .setMessage("Clear the list of items?")
-                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            clearItemList();
-                        }
-                    })
-                    .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            dialog.cancel();
-                        }
-                    });
-            shownItemAlert = true;
-            alertDialogueBuilder.create().show();
-        }
+        AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
+        alertDialogueBuilder//.setTitle("Alert")
+                .setMessage("Clear the list of items?")
+                .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        clearItemList();
+                    }
+                })
+                .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+        shownItemAlert = true;
+        alertDialogueBuilder.create().show();
     }
 
     public void showMapAlert() {
@@ -452,13 +450,14 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("SLIC", s);
     }
 
-    public void offlineGenerateRoute(){
+    public void offlineGenerateRoute() {
         try (InputStream fileInputStream = getResources().openRawResource(R.raw.attractions)) {
             Routes.generateRoutes(fileInputStream);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
     public void onlineGenerateRoute() {
         // Instantiate the RequestQueue.
         RequestQueue queue = Volley.newRequestQueue(this);
@@ -504,7 +503,7 @@ public class MainActivity extends AppCompatActivity implements
         Log.i("MainActivity", "Attraction selected");
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(selectedAttractions);
-            if(notificationTriggered) showMapNotification();
+            if (notificationTriggered) showMapNotification();
             notificationTriggered = true;
         }
         hideKeyboard();
