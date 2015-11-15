@@ -9,15 +9,12 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.PersistableBundle;
 import android.preference.PreferenceManager;
-import android.support.design.internal.NavigationMenuPresenter;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
-
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
@@ -29,7 +26,6 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.DragEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -38,11 +34,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.maps.model.LatLng;
 import com.slic.travelapp.ItinearyComponents.AttractionsFragment;
 import com.slic.travelapp.ItinearyComponents.BudgetFragment;
@@ -50,16 +50,12 @@ import com.slic.travelapp.ItinearyComponents.ItineraryFragment;
 import com.slic.travelapp.ItinearyComponents.ItineraryItem;
 import com.slic.travelapp.ItinearyComponents.Routes;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Field;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 
 /* Travel App
 * Things to Accomplish                      Status
@@ -85,7 +81,6 @@ public class MainActivity extends AppCompatActivity implements
     private static boolean shownItemAlert = false;
     private static boolean shownMapAlert = false;
     private static boolean notificationTriggered = false;
-    private static boolean notificationShow = false;
     public FloatingActionButton fab;
     private static LatLng srcLoc = null;
     private static LatLng destLoc = null;
@@ -112,14 +107,6 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (savedInstanceState != null) {
-            savedItinerary = savedInstanceState.getParcelableArrayList("ITINERARY");
-            notificationShow = savedInstanceState.getBoolean("NOTIFICATION");
-            shout("SAVEDItinerary: " + savedItinerary.toString());
-            shout("SAVEDNotification: " + String.valueOf(notificationShow));
-        } else {
-            shout("No saved state");
-        }
         notificationTriggered = false;
 
         setContentView(R.layout.activity_main);
@@ -172,11 +159,8 @@ public class MainActivity extends AppCompatActivity implements
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
         tabLayout.setupWithViewPager(mViewPager);
 
-        try (InputStream fileInputStream = getResources().openRawResource(R.raw.attractions)) {
-            Routes.generateRoutes(fileInputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        //onlineGenerateRoute();    // Allows attraction list to be dynamically updated online
+        offlineGenerateRoute();
 
         launchFragment(R.id.nav_home); // Initialize screen to the choosen fragment
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN); // Prevents keyboard froum auto launching
@@ -227,43 +211,6 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        outState.putParcelableArrayList("ITINERARY", savedItinerary);
-        super.onSaveInstanceState(outState);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        savePreference();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        loadPreference();
-    }
-
-    public void savePreference() {
-        SharedPreferences.Editor editor =PreferenceManager.getDefaultSharedPreferences(this).edit();
-        editor.putBoolean("NOTIFICATION", notificationShow);
-        editor.commit();
-        shout("Notification: " + notificationShow);
-    }
-    public void loadPreference(){
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        if(prefs != null) {
-            notificationShow = prefs.getBoolean("NOTIFICATION", false);
-            shout("Notification: " + notificationShow);
-        }
-    }
-
-    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
@@ -283,8 +230,7 @@ public class MainActivity extends AppCompatActivity implements
         if (id == R.id.action_settings) {
             return true;
         } else if (id == R.id.action_delete) {
-            itemList.clear();
-            ItemsFragment.updateSet();
+            clearItemAlert();
         } else if (id == R.id.action_marker) {
             MapsFragment.toggleMarkers();
         }
@@ -336,8 +282,7 @@ public class MainActivity extends AppCompatActivity implements
             findViewById(R.id.view_container).setVisibility(View.VISIBLE);
             findViewById(R.id.fragment_container).setVisibility(View.GONE);
 
-        }
-        else if (id == R.id.nav_item) {
+        } else if (id == R.id.nav_item) {
             fragment = new ItemsFragment();
             if (menu != null) {
                 showDeleteMenuItem();
@@ -384,6 +329,11 @@ public class MainActivity extends AppCompatActivity implements
         shout("Name: " + destName.toString());
     }
 
+    private void clearItemList() {
+        itemList.clear();
+        ItemsFragment.updateSet();
+    }
+
     public void getTaxi() {
         //uber://?client_id=YOUR_CLIENT_ID&action=setPickup&pickup[latitude]=37.775818&pickup[longitude]=-122.418028&pickup[nickname]=UberHQ&pickup[formatted_address]=1455%20Market%20St%2C%20San%20Francisco%2C%20CA%2094103&dropoff[latitude]=37.802374&dropoff[longitude]=-122.405818&dropoff[nickname]=Coit%20Tower&dropoff[formatted_address]=1%20Telegraph%20Hill%20Blvd%2C%20San%20Francisco%2C%20CA%2094133&product_id=a1111c8c-c720-46c3-8534-2fcdd730040d
         String uberUri = "uber://?client_id=" + CLIENT_ID + "&action=setPickup" +
@@ -417,13 +367,13 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void startContacts() {
-       // Toast.makeText(this, "Contacts Activity Started", Toast.LENGTH_LONG).show();
+        // Toast.makeText(this, "Contacts Activity Started", Toast.LENGTH_LONG).show();
         Intent intent = new Intent(this, ContactsActivity.class);
         startActivity(intent);
     }
 
     public void showItemAlert() {
-        if(!shownItemAlert){
+        if (!shownItemAlert) {
             AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
             alertDialogueBuilder//.setTitle("Alert")
                     .setMessage("Press and hold on an item to remove it.")
@@ -438,8 +388,30 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    public void clearItemAlert() {
+        if (!shownItemAlert) {
+            AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
+            alertDialogueBuilder//.setTitle("Alert")
+                    .setMessage("Clear the list of items?")
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            clearItemList();
+                        }
+                    })
+                    .setNegativeButton("No", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.cancel();
+                        }
+                    });
+            shownItemAlert = true;
+            alertDialogueBuilder.create().show();
+        }
+    }
+
     public void showMapAlert() {
-        if(!shownMapAlert) {
+        if (!shownMapAlert) {
             AlertDialog.Builder alertDialogueBuilder = new AlertDialog.Builder(this);
             alertDialogueBuilder.setTitle("Alert")
                     .setMessage("Location markers placed into map")
@@ -453,13 +425,13 @@ public class MainActivity extends AppCompatActivity implements
             shownMapAlert = true;
         }
     }
-    public void showMapNotification(){
+
+    public void showMapNotification() {
         navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_home);
-        notificationShow = true;
     }
-    public void hideMapNotification(){
+
+    public void hideMapNotification() {
         navigationView.getMenu().getItem(0).setActionView(R.layout.item_menu_blank);
-        notificationShow = false;
     }
 
     public void hideAllMenuItem() {
@@ -480,14 +452,62 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("SLIC", s);
     }
 
+    public void offlineGenerateRoute(){
+        try (InputStream fileInputStream = getResources().openRawResource(R.raw.attractions)) {
+            Routes.generateRoutes(fileInputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void onlineGenerateRoute() {
+        // Instantiate the RequestQueue.
+        RequestQueue queue = Volley.newRequestQueue(this);
+        String url = "https://api.myjson.com/bins/45ovu";
+        // Request a string response from the provided URL.
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        // Display the first 500 characters of the response string.
+                        String jsonString = response;
+                        try (FileOutputStream fo = openFileOutput("myfile.txt", MODE_PRIVATE);
+                             OutputStreamWriter ow = new OutputStreamWriter(fo)
+                        ) {
+                            ow.write(jsonString);
+                            Toast.makeText(getApplicationContext(),
+                                    "File saved successfully!",
+                                    Toast.LENGTH_SHORT)
+                                    .show();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        InputStream is = new ByteArrayInputStream(jsonString.getBytes());
+                        try {
+                            Routes.generateRoutes(is);
+                            Log.i("Data download success!", "Success!");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e("Volley", "Error");
+            }
+        });
+// Add the request to the RequestQueue.
+        queue.add(stringRequest);
+    }
+
     @Override
     public void onAttractionsSelected(ArrayList<String> selectedAttractions) {
         Log.i("MainActivity", "Attraction selected");
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(selectedAttractions);
-            if(notificationTriggered || notificationShow) showMapNotification();
+            if(notificationTriggered) showMapNotification();
             notificationTriggered = true;
         }
+        hideKeyboard();
     }
 
     @Override
@@ -497,6 +517,7 @@ public class MainActivity extends AppCompatActivity implements
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(budget);
         }
+        hideKeyboard();
     }
 
     @Override
@@ -509,6 +530,7 @@ public class MainActivity extends AppCompatActivity implements
         if (itineraryFragment != null) {
             itineraryFragment.updateItinerary(hotel);
         }
+        hideKeyboard();
     }
 
     @Override
@@ -546,6 +568,7 @@ public class MainActivity extends AppCompatActivity implements
 
         @Override
         public Fragment getItem(int position) {
+            hideKeyboard();
             // getItem is called to instantiate the fragment for the given page.
             switch (position) {
                 case 0:
