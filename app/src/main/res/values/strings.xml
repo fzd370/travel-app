@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">TravelApp</string>
+    <string name="app_name">Dot Travel</string>
     <string name="app_feedback_name">Feedback</string>
     <string name="app_contacts_name">Useful Contacts</string>
     <string name="search_hint">Type to search for a location ....</string>
